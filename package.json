@@ -1,0 +1,13 @@
+{
+  "name": "persistent-priority-queue",
+  "version": "1.0.0",
+  "description": "A file-persisted priority queue implementation (insert, extract_min, extract_max, peek, update, delete, is_empty).",
+  "main": "module.js",
+  "scripts": {
+    "test": "node --test test/module.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}
