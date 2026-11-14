@@ -48,6 +48,19 @@ test('insert rejects non-numeric priority', () => {
   cleanup(filePath);
 });
 
+test('insert and update reject Infinity and NaN priorities', () => {
+  const filePath = tempFilePath();
+  const pq = new PersistentPriorityQueue({ filePath });
+  for (const bad of [Infinity, -Infinity, NaN]) {
+    assert.throws(() => pq.insert('bad', bad), TypeError);
+  }
+  const id = pq.insert('ok', 1);
+  assert.throws(() => pq.update(id, Infinity), TypeError);
+  assert.equal(pq.size(), 1);
+  assert.equal(pq.peek('max').priority, 1);
+  cleanup(filePath);
+});
+
 test('extract_min returns entries in ascending priority order', () => {
   const filePath = tempFilePath();
   const pq = new PersistentPriorityQueue({ filePath });
