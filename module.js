@@ -335,7 +335,7 @@ class PersistentPriorityQueue {
   }
 
   _assertValidPriority(priority) {
-    if (typeof priority !== 'number' || Number.isNaN(priority)) {
+    if (typeof priority !== 'number' || !Number.isFinite(priority)) {
       throw new TypeError('priority must be a finite number');
     }
   }
