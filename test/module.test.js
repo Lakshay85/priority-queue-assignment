@@ -187,3 +187,59 @@ test('an empty/missing file initializes to an empty queue', () => {
 
   cleanup(filePath);
 });
+
+test('loading a state file with a non-finite persisted priority throws', () => {
+  const filePath = tempFilePath();
+  // JSON.stringify(Infinity) is null, so this is exactly what a state file
+  // looks like when a non-finite priority was persisted before validation.
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify({
+      items: [
+        { id: 'ok', value: 'good', priority: 5, seq: 0 },
+        { id: 'bad', value: 'corrupt', priority: null, seq: 1 },
+      ],
+      seq: 2,
+    })
+  );
+  assert.throws(
+    () => new PersistentPriorityQueue({ filePath }),
+    /non-finite priority/
+  );
+  cleanup(filePath);
+});
+
+test('loading a state file with duplicate entry ids throws', () => {
+  const filePath = tempFilePath();
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify({
+      items: [
+        { id: 'same', value: 'one', priority: 1, seq: 0 },
+        { id: 'same', value: 'two', priority: 2, seq: 1 },
+      ],
+      seq: 2,
+    })
+  );
+  assert.throws(
+    () => new PersistentPriorityQueue({ filePath }),
+    /duplicate entry id/
+  );
+  cleanup(filePath);
+});
+
+test('loading a state file with an invalid persisted seq throws', () => {
+  const filePath = tempFilePath();
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify({
+      items: [{ id: 'x', value: 'v', priority: 1, seq: 'zero' }],
+      seq: 1,
+    })
+  );
+  assert.throws(
+    () => new PersistentPriorityQueue({ filePath }),
+    /invalid seq/
+  );
+  cleanup(filePath);
+});
