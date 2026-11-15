@@ -340,6 +340,31 @@ class PersistentPriorityQueue {
     }
   }
 
+  /**
+   * Validate one entry read from the state file. Throws a plain Error
+   * (not TypeError) because the failure is corrupt persisted data, not a
+   * bad API argument.
+   */
+  _assertValidPersistedItem(item, position) {
+    const where = `${this.filePath}: entry at index ${position}`;
+    if (item === null || typeof item !== 'object') {
+      throw new Error(`Failed to load queue state from ${where} is not an object`);
+    }
+    if (typeof item.id !== 'string' || item.id.length === 0) {
+      throw new Error(`Failed to load queue state from ${where} has no valid id`);
+    }
+    if (typeof item.priority !== 'number' || !Number.isFinite(item.priority)) {
+      throw new Error(
+        `Failed to load queue state from ${where} has a non-finite priority ` +
+        `(${JSON.stringify(item.priority)}); the state file is corrupt or was ` +
+        `written with an unvalidated priority`
+      );
+    }
+    if (typeof item.seq !== 'number' || !Number.isInteger(item.seq) || item.seq < 0) {
+      throw new Error(`Failed to load queue state from ${where} has an invalid seq`);
+    }
+  }
+
   // ---------------------------------------------------------------------
   // Persistence
   // ---------------------------------------------------------------------
@@ -371,11 +396,27 @@ class PersistentPriorityQueue {
     const items = Array.isArray(parsed.items) ? parsed.items : [];
     this._seq = Number.isInteger(parsed.seq) ? parsed.seq : items.length;
 
+    // Validate every persisted entry before trusting it. A state file can
+    // contain entries this process never would have written - most notably
+    // `priority: null`, which is exactly what JSON.stringify(Infinity)
+    // produces when a non-finite priority slips past validation on insert.
+    // Loaded silently, such an entry corrupts extraction order (null
+    // coerces to 0 in comparisons) and then gets re-saved on the next
+    // mutation. Fail fast with a descriptive error instead.
+    items.forEach((item, i) => this._assertValidPersistedItem(item, i));
+
     // Load as a flat array, then re-heapify defensively rather than
     // trusting that the on-disk array still satisfies the heap property
     // (e.g. if the JSON file was ever hand-edited).
     this.heap = items;
-    this.heap.forEach((item, i) => this._indexOf.set(item.id, i));
+    this.heap.forEach((item, i) => {
+      if (this._indexOf.has(item.id)) {
+        throw new Error(
+          `Failed to load queue state from ${this.filePath}: duplicate entry id "${item.id}"`
+        );
+      }
+      this._indexOf.set(item.id, i);
+    });
     for (let i = Math.floor(this.heap.length / 2) - 1; i >= 0; i--) {
       this._siftDown(i);
     }
